@@ -44,4 +44,3 @@ void sendData() {
   }
   DEBUG(httpResponseCode);
 }
-

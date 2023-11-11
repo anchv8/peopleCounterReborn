@@ -16,34 +16,33 @@ void saveCustomParameters() {
 
 CustomParameters loadCustomParameters() {
   CustomParameters localParams;
-    File configFile = SPIFFS.open("/config.json", "r");
-    if (!configFile) {
-        Serial.println("Failed to open config file");
-        return localParams;
-    }
-
-    size_t size = configFile.size();
-    if (size == 0) {
-        Serial.println("Config file is empty");
-        configFile.close();
-        return localParams;
-    }
-
-    std::unique_ptr<char[]> buf(new char[size + 1]);
-    configFile.readBytes(buf.get(), size);
-    configFile.close();
-    buf[size] = '\0';
-
-    DynamicJsonDocument jsonConfig(512);
-    DeserializationError error = deserializeJson(jsonConfig, buf.get());
-    if (error) {
-        Serial.println("Failed to parse config file");
-        return localParams;
-    }
-
-    localParams.apiKey = jsonConfig["apiKey"].as<String>();
-    localParams.sensName = jsonConfig["sensName"].as<String>();
-
+  File configFile = SPIFFS.open("/config.json", "r");
+  if (!configFile) {
+    Serial.println("Failed to open config file");
     return localParams;
-}
+  }
 
+  size_t size = configFile.size();
+  if (size == 0) {
+    Serial.println("Config file is empty");
+    configFile.close();
+    return localParams;
+  }
+
+  std::unique_ptr<char[]> buf(new char[size + 1]);
+  configFile.readBytes(buf.get(), size);
+  configFile.close();
+  buf[size] = '\0';
+
+  DynamicJsonDocument jsonConfig(512);
+  DeserializationError error = deserializeJson(jsonConfig, buf.get());
+  if (error) {
+    Serial.println("Failed to parse config file");
+    return localParams;
+  }
+
+  localParams.apiKey = jsonConfig["apiKey"].as<String>();
+  localParams.sensName = jsonConfig["sensName"].as<String>();
+
+  return localParams;
+}

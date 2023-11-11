@@ -14,7 +14,7 @@ void wifiSetup() {
   wifiManager.addParameter(&customSensName);
   wifiManager.addParameter(&customTimezone);
   wifiManager.setSaveConfigCallback(saveConfigCallback);
-  wifiManager.autoConnect("AutoConnectAP");
-  
+  wifiManager.autoConnect("WiFi-Counter");
+
   DEBUG("Connected to Wi-Fi");
 }

@@ -12,8 +12,7 @@ void sensInit() {
     delay(100);
   }
 
-  lox.setMeasurementTimingBudgetMicroSeconds(250000);
-
+  lox.setMeasurementTimingBudgetMicroSeconds(270000);
 
   uint16_t calibrated_value;
   VL53L0X_RangingMeasurementData_t measure;

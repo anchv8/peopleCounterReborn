@@ -1,16 +1,18 @@
 #define VL53LOX_ShutdownPin 12   // Пин вкл/выкл лидара
 #define VL53LOX_InterruptPin 14  // Пин прерывания
 #define ESPDebug                 // Включаем или выключаем дебаг режим
+#define THRESHOLD_SPEED 35
 
 #ifdef ESPDebug
+//#define DEBUG(x) WebSerial.println(x)
 #define DEBUG(x) Serial.println(x)
 #else
 #define DEBUG(x)
 #endif
 
 #include <Arduino.h>
-#include <WiFiManager.h>
 #include <ESP8266WiFi.h>
+#include <ESPAsyncWiFiManager.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
 #include <NTPClient.h>
@@ -20,18 +22,22 @@
 #include <FS.h>
 #include <Adafruit_VL53L0X.h>
 #include "GyverTimer.h"
+#include <ESPAsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <WebSerial.h>
 
-const String FIRMWARE_VERSION = "1.2";
+const String FIRMWARE_VERSION = "1.3";
 
-const int buttonPin = 16; // Пин, к которому подключена кнопка
-const unsigned long longPressTime = 5000; // Время удержания для сброса в миллисекундах
+const long delayTime = 1000; // Задержка 5 секунд
+long lastDetectionTime = 0;
+bool objectDetected = false;
 
 int buttonState = HIGH;
-unsigned long buttonPressTime = 0;  // Время, когда кнопка была впервые нажата
-int eventCounter = 0;    // Счетчик событий
-bool eventFlag = false;  // Флаг события
-const char* serverURL = "192.168.100.33";  // Адрес сервера
-const int serverPort = 8000;               // Порт сервера
+unsigned long buttonPressTime = 0;         // Время, когда кнопка была впервые нажата
+int eventCounter = 0;                      // Счетчик событий
+bool eventFlag = false;                    // Флаг события
+const char* serverURL = "192.168.100.15";  // Адрес сервера
+const int serverPort = 7000;               // Порт сервера
 static const char* serverRegisterPath = "/api/register_sensor/";
 static const char* serverPath = "/api/update_visitor_count/";
 static const char* versionCheckUrl = "/update_firmware/";
@@ -85,7 +91,8 @@ const char timezone_option_list[] PROGMEM = R"(
     </select>
 )";
 
-
+AsyncWebServer server(80);
+DNSServer dns;
 
 WiFiUDP ntpUDP;  // Экземпляр класса для получения времени с интернетов
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 21600);
@@ -94,10 +101,10 @@ Adafruit_VL53L0X lox = Adafruit_VL53L0X();
 Adafruit_VL53L0X::VL53L0X_Sense_config_t long_range = Adafruit_VL53L0X::VL53L0X_SENSE_LONG_RANGE;
 TwoWire* i2c = &Wire;
 
-WiFiManager wifiManager;
-WiFiManagerParameter customApiKey("apiKey", "API Ключ", apiKey, 16);
-WiFiManagerParameter customSensName("sensName", "Имя датчика", sensName, 32);
-WiFiManagerParameter customTimezone("timezone", "Timezone", timezone, 5, timezone_option_list);
+AsyncWiFiManager wifiManager(&server, &dns);
+AsyncWiFiManagerParameter customApiKey("apiKey", "API Ключ", apiKey, 16);
+AsyncWiFiManagerParameter customSensName("sensName", "Имя датчика", sensName, 32);
+AsyncWiFiManagerParameter customTimezone("timezone", "Timezone", timezone, 5, timezone_option_list);
 
 WiFiClient client;
 
@@ -120,22 +127,23 @@ void handle() {
 }
 
 void setup() {
-  pinMode(buttonPin, INPUT_PULLUP);
 #ifdef ESPDebug
   Serial.begin(115200);
+  WebSerial.begin(&server);
 #endif
   // Инициализация WiFiManager
   wifiSetup();
   param = loadCustomParameters();
-  #ifdef ESPDebug
+#ifdef ESPDebug
   DEBUG("Firmware Version");
   DEBUG(FIRMWARE_VERSION);
   delay(5000);
-  #endif
+#endif
+  server.begin();
   registerDevice();
   DEBUG("Firmware Version");
   DEBUG(FIRMWARE_VERSION);
-  int timezoneOffsetSeconds = atoi(param.timezone) * 3600; // Преобразуйте часы в секунды
+  int timezoneOffsetSeconds = atoi(param.timezone) * 3600;  // Преобразуйте часы в секунды
   timeClient.setTimeOffset(timezoneOffsetSeconds);
   timeClient.begin();
   timeClient.update();
@@ -152,12 +160,25 @@ void loop() {
 
   if (sendTimer.isReady()) sendData();
   if (digitalRead(VL53LOX_InterruptPin) == LOW) {
-    handle();
+    VL53L0X_RangingMeasurementData_t measure;
+    lox.getRangingMeasurement(&measure, false);
+
+    if (measure.RangeStatus != 4) {
+      if (!objectDetected) {
+        if ((millis() - lastDetectionTime) > delayTime) {
+          objectDetected = true;
+          lastDetectionTime = millis();
+          handle();
+        }
+      }
+    } else {
+    objectDetected = false;
+    }
   }
 
   if (currentHour == 23 && currentMinute == 0) {
     DEBUG("waiting for update check");
     checkForUpdates();
-    delay(60000); // Ждите минуту, чтобы функция не выполнялась несколько раз в 23:00
-}
+    delay(61000);  // Ждите минуту, чтобы функция не выполнялась несколько раз в 23:00
+  }
 }
