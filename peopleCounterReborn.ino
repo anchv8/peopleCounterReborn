@@ -26,24 +26,22 @@
 #include <ESPAsyncWebServer.h>
 #include <WebSerial.h>
 
-const String FIRMWARE_VERSION = "1.3";
+const String FIRMWARE_VERSION = "1.91";
 
 const long delayTime = 1000; // Задержка 5 секунд
 long lastDetectionTime = 0;
 bool objectDetected = false;
 
-int buttonState = HIGH;
-unsigned long buttonPressTime = 0;         // Время, когда кнопка была впервые нажата
 int eventCounter = 0;                      // Счетчик событий
 bool eventFlag = false;                    // Флаг события
-const char* serverURL = "192.168.100.15";  // Адрес сервера
-const int serverPort = 7000;               // Порт сервера
+const char* serverURL = "85.209.9.215";  // Адрес сервера
+const int serverPort = 81;               // Порт сервера
 static const char* serverRegisterPath = "/api/register_sensor/";
 static const char* serverPath = "/api/update_visitor_count/";
 static const char* versionCheckUrl = "/update_firmware/";
 static const char* fileUrl = "/download_firmware/firmware.bin";
-char* apiKey;
-char* sensName;
+char* aKey;
+char* sName;
 char timezone[5] = "+00";
 char registrationData[64];
 char jsonPayload[256];
@@ -102,8 +100,8 @@ Adafruit_VL53L0X::VL53L0X_Sense_config_t long_range = Adafruit_VL53L0X::VL53L0X_
 TwoWire* i2c = &Wire;
 
 AsyncWiFiManager wifiManager(&server, &dns);
-AsyncWiFiManagerParameter customApiKey("apiKey", "API Ключ", apiKey, 16);
-AsyncWiFiManagerParameter customSensName("sensName", "Имя датчика", sensName, 32);
+AsyncWiFiManagerParameter customApiKey("apiKey", "API Key", aKey, 16);
+AsyncWiFiManagerParameter customSensName("sensName", "Sensor name", sName, 32);
 AsyncWiFiManagerParameter customTimezone("timezone", "Timezone", timezone, 5, timezone_option_list);
 
 WiFiClient client;
@@ -124,6 +122,7 @@ void handle() {
   eventCounter++;
   DEBUG("Detected!");
   lox.clearInterruptMask(false);
+  delay(1000);
 }
 
 void setup() {
@@ -153,7 +152,6 @@ void setup() {
 }
 
 void loop() {
-  //button();
   timeClient.update();
   int currentHour = timeClient.getHours();
   int currentMinute = timeClient.getMinutes();
@@ -165,11 +163,11 @@ void loop() {
 
     if (measure.RangeStatus != 4) {
       if (!objectDetected) {
-        if ((millis() - lastDetectionTime) > delayTime) {
-          objectDetected = true;
-          lastDetectionTime = millis();
-          handle();
-        }
+          if ((millis() - lastDetectionTime) > delayTime) {
+            objectDetected = true;
+            lastDetectionTime = millis();
+            handle();
+          }
       }
     } else {
     objectDetected = false;
